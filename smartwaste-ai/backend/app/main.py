@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.analytics import router as analytics_router
 from app.api.auth import router as auth_router
+from app.api.chat import router as chat_router
 from app.api.collections import router as collections_router
 from app.api.reports import router as reports_router
 from app.api.waste import router as waste_router
@@ -33,6 +34,7 @@ def health():
 
 
 app.include_router(auth_router, prefix="/api")
+app.include_router(chat_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
 app.include_router(collections_router, prefix="/api")
 app.include_router(analytics_router, prefix="/api")

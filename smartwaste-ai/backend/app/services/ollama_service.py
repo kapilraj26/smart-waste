@@ -137,6 +137,28 @@ def _chat(payload: dict) -> str:
     return data.get("message", {}).get("content", "")
 
 
+CHAT_SYSTEM = """You are the SmartWaste AI assistant inside a municipal waste-operations console.
+Answer concisely in plain language (no emojis). You help with: which bin a waste item goes in
+(Blue bin - Recyclables, Green bin - Compost, E-waste depot, General waste), pickup scheduling,
+recycling guidance, and explaining dashboard metrics. If unsure, say so and suggest asking the
+operations team. Keep replies under 150 words unless the user asks for detail."""
+
+
+def chat_reply(history: list[dict]) -> str:
+    """Free-text assistant reply over [{{role, content}}] history (roles: user/assistant)."""
+    content = _chat(
+        {
+            "model": settings.OLLAMA_MODEL,
+            "stream": False,
+            "options": {"temperature": 0.4},
+            "messages": [{"role": "system", "content": CHAT_SYSTEM}, *history],
+        }
+    ).strip()
+    if not content:
+        raise ValueError("The AI model returned an empty response. Try again.")
+    return content
+
+
 def _parse_json(content: str) -> dict:
     text = content.strip()
     if text.startswith("```"):

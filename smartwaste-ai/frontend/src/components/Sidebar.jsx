@@ -6,6 +6,7 @@ const NAV = [
   { section: "Overview" },
   { to: "/dashboard", label: "Dashboard", icon: "dashboard" },
   { to: "/analytics", label: "Analytics", icon: "chart" },
+  { to: "/assistant", label: "AI Assistant", icon: "chat" },
   { section: "Operations" },
   { to: "/scanner", label: "Waste Scanner", icon: "scan" },
   { to: "/reports", label: "Waste Reports", icon: "report" },

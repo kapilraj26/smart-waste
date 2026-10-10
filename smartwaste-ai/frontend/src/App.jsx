@@ -3,6 +3,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AdminLayout from "./layouts/AdminLayout";
 import UserLayout from "./layouts/UserLayout";
 import Analytics from "./pages/Analytics";
+import AIChat from "./pages/AIChat";
 import CollectionTasks from "./pages/CollectionTasks";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
@@ -31,6 +32,7 @@ export default function App() {
           }
         >
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/assistant" element={<AIChat />} />
           <Route path="/scanner" element={<WasteScanner />} />
           <Route path="/reports" element={<WasteReports />} />
           <Route path="/collections" element={<CollectionTasks />} />
