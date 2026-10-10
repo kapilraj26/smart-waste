@@ -1,28 +1,53 @@
 import { useRef, useState } from "react";
 import Icon from "../components/Icon";
 import StatusBadge from "../components/StatusBadge";
+import { classifyWaste } from "../services/wasteService";
+
+const BIN_GUIDANCE = {
+  Plastic: "Rinse the container, remove the cap, and place it in the blue bin.",
+  Organic: "Place food scraps in the green compost bin.",
+  Paper: "Keep paper dry and place it in the blue bin.",
+  Glass: "Rinse and place glass in the blue bin.",
+  Metal: "Rinse metal cans and place them in the blue bin.",
+  "E-Waste": "Do not bin — drop off at the e-waste depot.",
+};
 
 export default function WasteScanner() {
   const fileRef = useRef(null);
+  const [file, setFile] = useState(null);
   const [fileName, setFileName] = useState("");
   const [result, setResult] = useState(null);
   const [scanning, setScanning] = useState(false);
+  const [error, setError] = useState("");
 
-  function onFile(file) {
-    if (!file) return;
-    setFileName(file.name);
+  function onPick(f) {
+    if (!f) return;
+    setFile(f);
+    setFileName(f.name);
+    setResult(null);
+    setError("");
+  }
+
+  async function onClassify() {
+    const target = file || fileRef.current?.files?.[0];
+    if (!target) return;
     setScanning(true);
     setResult(null);
-    // Placeholder inference — replaced by POST /api/waste/classify once live.
-    setTimeout(() => {
-      setScanning(false);
+    setError("");
+    try {
+      // Real backend call — result is stored in Postgres `waste_records`.
+      const data = await classifyWaste(target);
       setResult({
-        category: "Plastic",
-        confidence: "94.2%",
-        bin: "Blue bin — Recyclables",
-        guidance: "Rinse the container, remove the cap, and place it in the blue bin.",
+        category: data.category,
+        confidence: `${Number(data.confidence).toFixed(1)}%`,
+        bin: data.bin_name,
+        guidance: BIN_GUIDANCE[data.category] || "Follow local disposal guidance.",
       });
-    }, 1400);
+    } catch {
+      setError("Classification failed. Is the backend running?");
+    } finally {
+      setScanning(false);
+    }
   }
 
   return (
@@ -55,11 +80,12 @@ export default function WasteScanner() {
               type="file"
               accept="image/*"
               hidden
-              onChange={(e) => onFile(e.target.files?.[0])}
+              onChange={(e) => onPick(e.target.files?.[0])}
             />
           </div>
+          {error && <div style={{ color: "var(--warn)", fontSize: 13, marginTop: 12 }}>{error}</div>}
           <div style={{ marginTop: 16 }}>
-            <button className="btn btn-primary btn-block" disabled={!fileName || scanning} onClick={() => fileRef.current?.files?.[0] && onFile(fileRef.current.files[0])}>
+            <button className="btn btn-primary btn-block" disabled={!fileName || scanning} onClick={onClassify}>
               {scanning ? "Classifying..." : "Classify waste"}
             </button>
           </div>

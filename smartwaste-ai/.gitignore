@@ -36,3 +36,12 @@ Thumbs.db
 
 # Docker
 *.log
+
+# Local dev database (SQLite) — never commit real data
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Vite temp files
+*.timestamp-*.mjs

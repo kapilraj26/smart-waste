@@ -1,24 +1,47 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Icon from "../components/Icon";
 import StatusBadge from "../components/StatusBadge";
 import { currentUser } from "../services/authService";
-
-const STATS = [
-  { label: "Waste classified", value: "1,284", icon: "scan", bg: "var(--brand-50)", fg: "var(--brand-700)" },
-  { label: "Pickups completed", value: "312", icon: "truck", bg: "var(--info-bg)", fg: "var(--info)" },
-  { label: "Active reports", value: "48", icon: "report", bg: "var(--warn-bg)", fg: "var(--warn)" },
-  { label: "Diversion rate", value: "76%", icon: "chart", bg: "var(--success-bg)", fg: "var(--success)" },
-];
-
-const RECENT = [
-  { id: "WR-1042", category: "Plastic", location: "Sector 9, Bin A-12", weight: "4.2 kg", status: "Collected", reportedAt: "Today, 09:41" },
-  { id: "WR-1041", category: "Organic", location: "Sector 4, Bin C-03", weight: "7.8 kg", status: "Scheduled", reportedAt: "Today, 08:15" },
-  { id: "WR-1040", category: "E-Waste", location: "Sector 9, Depot 2", weight: "2.1 kg", status: "In-Progress", reportedAt: "Yesterday, 16:02" },
-  { id: "WR-1039", category: "Paper", location: "Sector 1, Bin B-07", weight: "3.5 kg", status: "Pending", reportedAt: "Yesterday, 11:26" },
-];
+import { getAnalyticsSummary, listCollections } from "../services/collectionService";
+import { formatReport, listReports } from "../services/reportService";
 
 export default function Dashboard() {
   const user = currentUser();
+  const [summary, setSummary] = useState(null);
+  const [recent, setRecent] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [s, reports, collections] = await Promise.all([
+          getAnalyticsSummary(),
+          listReports(),
+          listCollections(),
+        ]);
+        if (!alive) return;
+        setSummary(s);
+        setRecent(reports.slice(0, 4).map(formatReport));
+        setTasks(collections.slice(0, 3));
+      } catch {
+        if (alive) setError("Could not load database data. Is the backend running?");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const stats = [
+    { label: "Waste classified", value: summary ? String(summary.total_reports) : "—", icon: "scan", bg: "var(--brand-50)", fg: "var(--brand-700)" },
+    { label: "Pickups completed", value: summary ? String(summary.pickups_completed) : "—", icon: "truck", bg: "var(--info-bg)", fg: "var(--info)" },
+    { label: "Active reports", value: summary ? String(summary.active_reports) : "—", icon: "report", bg: "var(--warn-bg)", fg: "var(--warn)" },
+    { label: "Diversion rate", value: summary ? `${summary.diversion_rate}%` : "—", icon: "chart", bg: "var(--success-bg)", fg: "var(--success)" },
+  ];
 
   return (
     <div className="page">
@@ -35,75 +58,84 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="stat-grid">
-        {STATS.map((s) => (
-          <div className="card stat-card" key={s.label}>
-            <span className="stat-icon" style={{ background: s.bg, color: s.fg }}>
-              <Icon name={s.icon} size={22} />
-            </span>
-            <span>
-              <div className="stat-value">{s.value}</div>
-              <div className="stat-label">{s.label}</div>
-            </span>
-          </div>
-        ))}
-      </div>
+      {loading && <div className="cell-muted" style={{ padding: "12px 0" }}>Loading database data...</div>}
+      {error && <div className="card card-pad" style={{ color: "var(--warn)" }}>{error}</div>}
 
-      <div className="grid-2">
-        <div className="card">
-          <div className="card-head">
-            <span className="card-title">Recent reports</span>
-            <Link className="link-btn" to="/reports">View all</Link>
-          </div>
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Report</th>
-                  <th>Category</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {RECENT.map((r) => (
-                  <tr key={r.id}>
-                    <td>
-                      <div className="cell-strong">{r.id}</div>
-                      <div className="cell-muted">{r.location}</div>
-                    </td>
-                    <td>{r.category}</td>
-                    <td><StatusBadge status={r.status} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-head">
-            <span className="card-title">Today&apos;s collections</span>
-            <Link className="link-btn" to="/collections">View all</Link>
-          </div>
-          <div className="task-list">
-            {[
-              { t: "Sector 9 route — bins A-01 to A-20", m: "Crew B · Due 12:00", done: true },
-              { t: "Depot 2 e-waste pickup", m: "Crew A · Due 14:30", done: true },
-              { t: "Sector 4 organic round", m: "Crew C · Due 16:00", done: false },
-            ].map((task) => (
-              <div className="task-row" key={task.t}>
-                <span className={`task-check${task.done ? " done" : ""}`}>
-                  {task.done && <Icon name="check" size={13} strokeWidth={3} />}
+      {!loading && !error && (
+        <>
+          <div className="stat-grid">
+            {stats.map((s) => (
+              <div className="card stat-card" key={s.label}>
+                <span className="stat-icon" style={{ background: s.bg, color: s.fg }}>
+                  <Icon name={s.icon} size={22} />
                 </span>
-                <div className="task-main">
-                  <div className="task-title">{task.t}</div>
-                  <div className="task-meta">{task.m}</div>
-                </div>
+                <span>
+                  <div className="stat-value">{s.value}</div>
+                  <div className="stat-label">{s.label}</div>
+                </span>
               </div>
             ))}
           </div>
-        </div>
-      </div>
+
+          <div className="grid-2">
+            <div className="card">
+              <div className="card-head">
+                <span className="card-title">Recent reports</span>
+                <Link className="link-btn" to="/reports">View all</Link>
+              </div>
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Report</th>
+                      <th>Category</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recent.map((r) => (
+                      <tr key={r.id}>
+                        <td>
+                          <div className="cell-strong">{r.id}</div>
+                          <div className="cell-muted">{r.location}</div>
+                        </td>
+                        <td>{r.category}</td>
+                        <td><StatusBadge status={r.status} /></td>
+                      </tr>
+                    ))}
+                    {recent.length === 0 && (
+                      <tr><td colSpan={3} className="cell-muted" style={{ textAlign: "center", padding: 24 }}>No reports in the database yet.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-head">
+                <span className="card-title">Today&apos;s collections</span>
+                <Link className="link-btn" to="/collections">View all</Link>
+              </div>
+              <div className="task-list">
+                {tasks.map((task) => (
+                  <div className="task-row" key={task.code}>
+                    <span className={`task-check${task.done ? " done" : ""}`}>
+                      {task.done && <Icon name="check" size={13} strokeWidth={3} />}
+                    </span>
+                    <div className="task-main">
+                      <div className="task-title">{task.title}</div>
+                      <div className="task-meta">{task.meta}</div>
+                    </div>
+                  </div>
+                ))}
+                {tasks.length === 0 && (
+                  <div className="cell-muted" style={{ padding: 16 }}>No collection tasks in the database yet.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

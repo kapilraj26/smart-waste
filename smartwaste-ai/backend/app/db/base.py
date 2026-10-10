@@ -6,4 +6,4 @@ class Base(DeclarativeBase):
 
 
 # Import models here so Base.metadata.create_all() sees every table.
-from app.models import user  # noqa: F401,E402
+from app.models import collection, report, user, waste  # noqa: F401,E402

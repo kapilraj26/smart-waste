@@ -1,22 +1,32 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Icon from "../components/Icon";
 import StatusBadge from "../components/StatusBadge";
 import WasteCard from "../components/WasteCard";
-
-const REPORTS = [
-  { id: "WR-1042", category: "Plastic", location: "Sector 9, Bin A-12", weight: "4.2 kg", status: "Collected", reportedAt: "Today, 09:41", reporter: "A. Khan" },
-  { id: "WR-1041", category: "Organic", location: "Sector 4, Bin C-03", weight: "7.8 kg", status: "Scheduled", reportedAt: "Today, 08:15", reporter: "S. Malik" },
-  { id: "WR-1040", category: "E-Waste", location: "Sector 9, Depot 2", weight: "2.1 kg", status: "In-Progress", reportedAt: "Yesterday, 16:02", reporter: "R. Ahmed" },
-  { id: "WR-1039", category: "Paper", location: "Sector 1, Bin B-07", weight: "3.5 kg", status: "Pending", reportedAt: "Yesterday, 11:26", reporter: "F. Iqbal" },
-  { id: "WR-1038", category: "Glass", location: "Sector 6, Bin D-11", weight: "5.0 kg", status: "Collected", reportedAt: "Oct 8, 15:44", reporter: "A. Khan" },
-  { id: "WR-1037", category: "Metal", location: "Sector 2, Depot 1", weight: "6.3 kg", status: "Missed", reportedAt: "Oct 8, 10:05", reporter: "S. Malik" },
-];
+import { formatReport, listReports } from "../services/reportService";
 
 export default function WasteReports() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const rows = REPORTS.filter(
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const data = await listReports();
+        if (alive) setReports(data.map(formatReport));
+      } catch {
+        if (alive) setError("Could not load reports from the database.");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const rows = reports.filter(
     (r) =>
       (status === "all" || r.status.toLowerCase() === status) &&
       `${r.id} ${r.category} ${r.location}`.toLowerCase().includes(query.toLowerCase())
@@ -27,12 +37,11 @@ export default function WasteReports() {
       <div className="page-head">
         <div>
           <div className="page-title">Waste Reports</div>
-          <div className="page-sub">{rows.length} of {REPORTS.length} reports shown</div>
-        </div>
-        <div className="page-actions">
-          <button className="btn btn-primary"><Icon name="plus" size={16} /> New report</button>
+          <div className="page-sub">{loading ? "Loading..." : `${rows.length} of ${reports.length} reports shown`}</div>
         </div>
       </div>
+
+      {error && <div className="card card-pad" style={{ color: "var(--warn)", marginBottom: 16 }}>{error}</div>}
 
       <div className="toolbar">
         <div className="input-wrap toolbar-search">
@@ -67,7 +76,10 @@ export default function WasteReports() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {loading && (
+                <tr><td colSpan={5} className="cell-muted" style={{ textAlign: "center", padding: 32 }}>Loading database data...</td></tr>
+              )}
+              {!loading && rows.map((r) => (
                 <tr key={r.id}>
                   <td>
                     <div className="cell-strong">{r.id}</div>
@@ -79,8 +91,10 @@ export default function WasteReports() {
                   <td><StatusBadge status={r.status} /></td>
                 </tr>
               ))}
-              {rows.length === 0 && (
-                <tr><td colSpan={5} className="cell-muted" style={{ textAlign: "center", padding: 32 }}>No reports match the current filters.</td></tr>
+              {!loading && rows.length === 0 && (
+                <tr><td colSpan={5} className="cell-muted" style={{ textAlign: "center", padding: 32 }}>
+                  {reports.length === 0 ? "No reports in the database yet." : "No reports match the current filters."}
+                </td></tr>
               )}
             </tbody>
           </table>
