@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class WasteClassifyOut(BaseModel):
@@ -12,3 +12,14 @@ class WasteClassifyOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class WasteAnalysis(BaseModel):
+    category: str
+    confidence: int = Field(ge=0, le=100)
+    bin: str
+    guidance: str
+    details: list[str] = []
+    recyclable: bool = False
+    model: str = ""
+    mode: str = ""

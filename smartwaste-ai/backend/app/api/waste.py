@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.api.auth import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.models.waste import WasteRecord
-from app.schemas.waste import WasteClassifyOut
+from app.schemas.waste import WasteAnalysis, WasteClassifyOut
+from app.services import ollama_service
 
 router = APIRouter(prefix="/waste", tags=["waste"])
 
@@ -17,6 +19,8 @@ BIN_MAP = {
     "Metal": "Blue bin — Recyclables",
     "E-Waste": "E-waste depot",
 }
+
+MAX_BYTES = 10 * 1024 * 1024
 
 
 @router.post("/classify", response_model=WasteClassifyOut)
@@ -47,3 +51,66 @@ def classify(
     db.commit()
     db.refresh(rec)
     return rec
+
+
+@router.get("/records", response_model=list[WasteClassifyOut])
+def records(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """Recent scanner classifications, newest first (Postgres `waste_records`)."""
+    return (
+        db.query(WasteRecord)
+        .order_by(desc(WasteRecord.created_at))
+        .limit(min(limit, 200))
+        .all()
+    )
+
+
+@router.post("/analyze", response_model=WasteAnalysis)
+async def analyze(
+    file: UploadFile = File(...),
+    hint: str | None = Form(default=None),
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    """Analyze a waste photo with the local Ollama model and persist the result.
+
+    Accepts camera captures and uploads. Requires login (Bearer token).
+    """
+    if file.content_type not in ("image/jpeg", "image/png", "image/webp"):
+        raise HTTPException(status_code=400, detail="Only JPG, PNG or WEBP photos are accepted")
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file")
+    if len(data) > MAX_BYTES:
+        raise HTTPException(status_code=400, detail="Photo must be under 10 MB")
+
+    try:
+        out = ollama_service.analyze_waste(data, hint)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except ValueError:
+        raise HTTPException(status_code=502, detail="The AI model returned an unreadable response. Try again.")
+
+    db.add(
+        WasteRecord(
+            category=out["category"],
+            confidence=float(out["confidence"]),
+            bin_name=out["bin"],
+            image_path=file.filename or "capture.jpg",
+        )
+    )
+    db.commit()
+
+    return WasteAnalysis(
+        category=out["category"],
+        confidence=out["confidence"],
+        bin=out["bin"],
+        guidance=out["guidance"],
+        details=out["details"],
+        recyclable=out["recyclable"],
+        model=out["_model"],
+        mode=out["_mode"],
+    )
