@@ -5,12 +5,14 @@ import StatusBadge from "../components/StatusBadge";
 import { currentUser } from "../services/authService";
 import { getAnalyticsSummary, listCollections } from "../services/collectionService";
 import { formatReport, listReports } from "../services/reportService";
+import { listWasteRecords } from "../services/wasteService";
 
 export default function Dashboard() {
   const user = currentUser();
   const [summary, setSummary] = useState(null);
   const [recent, setRecent] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [scans, setScans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -18,15 +20,17 @@ export default function Dashboard() {
     let alive = true;
     (async () => {
       try {
-        const [s, reports, collections] = await Promise.all([
+        const [s, reports, collections, records] = await Promise.all([
           getAnalyticsSummary(),
           listReports(),
           listCollections(),
+          listWasteRecords().catch(() => []),
         ]);
         if (!alive) return;
         setSummary(s);
         setRecent(reports.slice(0, 4).map(formatReport));
         setTasks(collections.slice(0, 3));
+        setScans((Array.isArray(records) ? records : []).slice(0, 5));
       } catch {
         if (alive) setError("Could not load database data. Is the backend running?");
       } finally {
@@ -132,6 +136,43 @@ export default function Dashboard() {
                   <div className="cell-muted" style={{ padding: 16 }}>No collection tasks in the database yet.</div>
                 )}
               </div>
+            </div>
+          </div>
+
+          <div className="card mt">
+            <div className="card-head">
+              <span className="card-title">Recent AI scans</span>
+              <Link className="link-btn" to="/scanner">Open scanner</Link>
+            </div>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Scan</th>
+                    <th>Bin</th>
+                    <th>Guidance</th>
+                    <th>Confidence</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scans.map((s) => (
+                    <tr key={s.id}>
+                      <td>
+                        <div className="cell-strong">
+                          <StatusBadge status={s.category} />
+                        </div>
+                        <div className="cell-muted">{s.created_at ? new Date(s.created_at).toLocaleString() : ""}</div>
+                      </td>
+                      <td>{s.bin_name}</td>
+                      <td style={{ maxWidth: 320 }}>{s.guidance || "—"}</td>
+                      <td>{typeof s.confidence === "number" ? `${Math.round(s.confidence)}%` : s.confidence}</td>
+                    </tr>
+                  ))}
+                  {scans.length === 0 && (
+                    <tr><td colSpan={4} className="cell-muted" style={{ textAlign: "center", padding: 24 }}>No scans stored yet. Classify a photo in the Waste Scanner.</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </>

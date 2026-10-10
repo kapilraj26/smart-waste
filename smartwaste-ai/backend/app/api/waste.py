@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
@@ -10,7 +12,6 @@ from app.schemas.waste import WasteAnalysis, WasteClassifyOut
 from app.services import ollama_service
 
 router = APIRouter(prefix="/waste", tags=["waste"])
-
 BIN_MAP = {
     "Plastic": "Blue bin — Recyclables",
     "Organic": "Green bin — Compost",
@@ -18,9 +19,28 @@ BIN_MAP = {
     "Glass": "Blue bin — Recyclables",
     "Metal": "Blue bin — Recyclables",
     "E-Waste": "E-waste depot",
+    "Textile": "Textile bank — Donate",
 }
 
 MAX_BYTES = 10 * 1024 * 1024
+
+
+def _record_out(rec: WasteRecord) -> dict:
+    """Serialize a row; `details` is stored as a JSON string in Postgres."""
+    try:
+        details = json.loads(rec.details or "[]")
+    except (TypeError, ValueError):
+        details = []
+    return {
+        "id": rec.id,
+        "category": rec.category,
+        "confidence": rec.confidence,
+        "bin_name": rec.bin_name,
+        "guidance": rec.guidance or "",
+        "details": details if isinstance(details, list) else [],
+        "recyclable": bool(rec.recyclable),
+        "created_at": rec.created_at,
+    }
 
 
 @router.post("/classify", response_model=WasteClassifyOut)
@@ -50,7 +70,7 @@ def classify(
     db.add(rec)
     db.commit()
     db.refresh(rec)
-    return rec
+    return _record_out(rec)
 
 
 @router.get("/records", response_model=list[WasteClassifyOut])
@@ -60,12 +80,13 @@ def records(
     _user: User = Depends(get_current_user),
 ):
     """Recent scanner classifications, newest first (Postgres `waste_records`)."""
-    return (
+    rows = (
         db.query(WasteRecord)
         .order_by(desc(WasteRecord.created_at))
         .limit(min(limit, 200))
         .all()
     )
+    return [_record_out(r) for r in rows]
 
 
 @router.post("/analyze", response_model=WasteAnalysis)
@@ -100,6 +121,9 @@ async def analyze(
             confidence=float(out["confidence"]),
             bin_name=out["bin"],
             image_path=file.filename or "capture.jpg",
+            guidance=out["guidance"],
+            details=json.dumps(out["details"]),
+            recyclable=bool(out["recyclable"]),
         )
     )
     db.commit()

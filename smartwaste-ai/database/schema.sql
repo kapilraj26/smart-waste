@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(100) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     hashed_password VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'user',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -45,6 +46,9 @@ CREATE TABLE IF NOT EXISTS waste_records (
     confidence DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     bin_name VARCHAR(100) NOT NULL DEFAULT '',
     image_path VARCHAR(255) NOT NULL DEFAULT '',
+    guidance TEXT NOT NULL DEFAULT '',
+    details TEXT NOT NULL DEFAULT '[]',
+    recyclable BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

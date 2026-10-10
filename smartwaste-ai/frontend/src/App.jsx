@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ManagementRoute from "./components/ManagementRoute";
 import AdminLayout from "./layouts/AdminLayout";
 import UserLayout from "./layouts/UserLayout";
 import Analytics from "./pages/Analytics";
@@ -7,6 +8,7 @@ import AIChat from "./pages/AIChat";
 import CollectionTasks from "./pages/CollectionTasks";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
+import ManagementReviews from "./pages/ManagementReviews";
 import NotFound from "./pages/NotFound";
 import Register from "./pages/Register";
 import WasteReports from "./pages/WasteReports";
@@ -37,6 +39,14 @@ export default function App() {
           <Route path="/reports" element={<WasteReports />} />
           <Route path="/collections" element={<CollectionTasks />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route
+            path="/management"
+            element={
+              <ManagementRoute>
+                <ManagementReviews />
+              </ManagementRoute>
+            }
+          />
         </Route>
 
         <Route

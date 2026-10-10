@@ -14,6 +14,7 @@ const TONE = {
   metal: "neutral",
   paper: "neutral",
   glass: "info",
+  textile: "info",
 };
 
 export default function StatusBadge({ status }) {

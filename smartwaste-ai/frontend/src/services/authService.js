@@ -1,7 +1,7 @@
 import api from "./api";
 
-export async function registerUser({ name, email, password }) {
-  const { data } = await api.post("/auth/register", { name, email, password });
+export async function registerUser({ name, email, password, role }) {
+  const { data } = await api.post("/auth/register", { name, email, password, role });
   localStorage.setItem("sw_token", data.access_token);
   localStorage.setItem("sw_user", JSON.stringify(data.user));
   return data;
@@ -25,4 +25,8 @@ export function currentUser() {
   } catch {
     return null;
   }
+}
+
+export function isManagement() {
+  return (currentUser()?.role || "user").toLowerCase() === "management";
 }

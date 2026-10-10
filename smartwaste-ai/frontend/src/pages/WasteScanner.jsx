@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import Icon from "../components/Icon";
 import StatusBadge from "../components/StatusBadge";
+import { currentUser } from "../services/authService";
+import { createReport } from "../services/reportService";
 import { analyzeWaste } from "../services/wasteService";
 
 export default function WasteScanner() {
@@ -17,6 +19,8 @@ export default function WasteScanner() {
   const [error, setError] = useState("");
   const [camOn, setCamOn] = useState(false);
   const [camError, setCamError] = useState("");
+  const [sent, setSent] = useState(null);
+  const [sending, setSending] = useState(false);
 
   function stopCamera() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -57,6 +61,7 @@ export default function WasteScanner() {
         if (photo?.url) URL.revokeObjectURL(photo.url);
         setPhoto({ blob, url: URL.createObjectURL(blob), name: "live-capture.jpg" });
         setResult(null);
+        setSent(null);
       },
       "image/jpeg",
       0.92
@@ -68,6 +73,7 @@ export default function WasteScanner() {
     if (photo?.url) URL.revokeObjectURL(photo.url);
     setPhoto({ blob: file, url: URL.createObjectURL(file), name: file.name });
     setResult(null);
+    setSent(null);
     setError("");
   }
 
@@ -75,6 +81,7 @@ export default function WasteScanner() {
     if (!photo) return;
     setError("");
     setResult(null);
+    setSent(null);
     setScanning(true);
     try {
       const data = await analyzeWaste(photo.blob, hint);
@@ -86,6 +93,26 @@ export default function WasteScanner() {
       );
     } finally {
       setScanning(false);
+    }
+  }
+
+  async function sendToManagement() {
+    if (!result || sending) return;
+    setError("");
+    setSending(true);
+    try {
+      const data = await createReport({
+        category: result.category,
+        location: "Scanner capture",
+        weight_kg: 0,
+        status: "Pending",
+        reporter: currentUser()?.name || "Operator",
+      });
+      setSent(data);
+    } catch {
+      setError("Could not send to management. Is the backend running?");
+    } finally {
+      setSending(false);
     }
   }
 
@@ -243,9 +270,26 @@ export default function WasteScanner() {
                   </ul>
                 </div>
               )}
+              {result.confidence < 70 && (
+                <div className="form-error" style={{ background: "var(--warn-bg)", color: "var(--warn)" }}>
+                  Low confidence — describe the item above (e.g. &ldquo;cotton shirt&rdquo;) and analyze again for an accurate result.
+                </div>
+              )}
               <div className="task-meta" style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
                 <StatusBadge status={result.recyclable ? "Recyclable" : "Not recyclable"} />
                 <span>Analyzed with {result.model} via Ollama</span>
+              </div>
+              <div style={{ marginTop: 16 }}>
+                {!sent ? (
+                  <button className="btn btn-outline btn-block" disabled={sending} onClick={sendToManagement}>
+                    <Icon name="arrowRight" size={16} />
+                    {sending ? "Sending..." : "Send to management"}
+                  </button>
+                ) : (
+                  <div className="form-error" style={{ background: "var(--success-bg)", color: "var(--success)" }}>
+                    Sent to management as report {sent.code} — status: Pending.
+                  </div>
+                )}
               </div>
             </div>
           )}

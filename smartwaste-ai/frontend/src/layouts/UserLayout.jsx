@@ -10,6 +10,7 @@ const TITLES = {
   "/collections": ["Collection Tasks", "Operations / Collection Tasks"],
   "/analytics": ["Analytics", "Overview / Analytics"],
   "/assistant": ["AI Assistant", "Overview / AI Assistant"],
+  "/management": ["Review Queue", "Management / Review Queue"],
 };
 
 export default function UserLayout() {

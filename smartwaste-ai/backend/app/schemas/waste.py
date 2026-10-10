@@ -8,6 +8,9 @@ class WasteClassifyOut(BaseModel):
     category: str
     confidence: float
     bin_name: str
+    guidance: str = ""
+    details: list[str] = []
+    recyclable: bool = False
     created_at: datetime
 
     class Config:

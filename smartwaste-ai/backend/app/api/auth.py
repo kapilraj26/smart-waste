@@ -32,10 +32,14 @@ def register(payload: UserRegister, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Email already registered")
     if len(payload.password) < 6:
         raise HTTPException(status_code=400, detail="Password must be 6+ characters")
+    role = (payload.role or "user").lower()
+    if role not in ("user", "management"):
+        raise HTTPException(status_code=400, detail="Role must be user or management")
     user = User(
         name=payload.name.strip(),
         email=payload.email.lower(),
         hashed_password=hash_password(payload.password),
+        role=role,
     )
     db.add(user)
     db.commit()
@@ -73,3 +77,10 @@ def get_current_user(
 @router.get("/me", response_model=UserOut)
 def me(current: User = Depends(get_current_user)):
     return UserOut.model_validate(current)
+
+
+def require_management(current: User = Depends(get_current_user)) -> User:
+    """Guard for management-only actions (e.g. setting report status)."""
+    if (current.role or "user").lower() != "management":
+        raise HTTPException(status_code=403, detail="Management role required")
+    return current

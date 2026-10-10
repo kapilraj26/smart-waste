@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { currentUser, logout } from "../services/authService";
+import { currentUser, isManagement, logout } from "../services/authService";
 import Icon from "./Icon";
 
 const NAV = [
@@ -11,6 +11,8 @@ const NAV = [
   { to: "/scanner", label: "Waste Scanner", icon: "scan" },
   { to: "/reports", label: "Waste Reports", icon: "report" },
   { to: "/collections", label: "Collection Tasks", icon: "truck" },
+  { section: "Management", roles: ["management"] },
+  { to: "/management", label: "Review Queue", icon: "check", roles: ["management"] },
 ];
 
 function initials(name) {
@@ -25,6 +27,8 @@ function initials(name) {
 
 export default function Sidebar() {
   const user = currentUser();
+  const role = (user?.role || "user").toLowerCase();
+  const visible = NAV.filter((item) => !item.roles || item.roles.includes(role));
 
   return (
     <aside className="sidebar">
@@ -39,7 +43,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="side-nav">
-        {NAV.map((item, i) =>
+        {visible.map((item, i) =>
           item.section ? (
             <div className="side-section" key={i}>
               {item.section}
@@ -63,7 +67,12 @@ export default function Sidebar() {
         <div className="side-user">
           <span className="avatar">{initials(user?.name)}</span>
           <span style={{ flex: 1, minWidth: 0 }}>
-            <div className="side-user-name">{user?.name || "Operator"}</div>
+            <div className="side-user-name">
+              {user?.name || "Operator"}{" "}
+              <span className={`badge ${role === "management" ? "badge-info" : "badge-neutral"}`} style={{ fontSize: 10 }}>
+                {role}
+              </span>
+            </div>
             <div className="side-user-mail">{user?.email || ""}</div>
           </span>
           <button

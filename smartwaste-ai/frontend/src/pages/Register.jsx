@@ -14,6 +14,7 @@ export default function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("user");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -22,7 +23,7 @@ export default function Register() {
     setError("");
     setLoading(true);
     try {
-      await registerUser({ name, email, password });
+      await registerUser({ name, email, password, role });
       navigate("/dashboard");
     } catch (err) {
       setError(err.response?.data?.detail || "Registration failed. Try another email.");
@@ -125,6 +126,39 @@ export default function Register() {
                 minLength={6}
                 autoComplete="new-password"
               />
+            </div>
+          </div>
+
+          <div className="field">
+            <span className="field-label">Account role</span>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {[
+                { value: "user", title: "Operator", sub: "Scan and report waste" },
+                { value: "management", title: "Management", sub: "Review and set status" },
+              ].map((r) => (
+                <label
+                  key={r.value}
+                  style={{
+                    display: "flex", gap: 10, alignItems: "flex-start",
+                    border: role === r.value ? "2px solid var(--brand-600)" : "1px solid var(--border-strong)",
+                    borderRadius: 10, padding: "10px 12px", cursor: "pointer",
+                    background: role === r.value ? "var(--brand-50)" : "#fff",
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="role"
+                    value={r.value}
+                    checked={role === r.value}
+                    onChange={(e) => setRole(e.target.value)}
+                    style={{ marginTop: 3, accentColor: "var(--brand-700)" }}
+                  />
+                  <span>
+                    <span className="cell-strong" style={{ display: "block", fontSize: 13.5 }}>{r.title}</span>
+                    <span className="cell-muted" style={{ fontSize: 12 }}>{r.sub}</span>
+                  </span>
+                </label>
+              ))}
             </div>
           </div>
 

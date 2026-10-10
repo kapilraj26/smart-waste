@@ -11,6 +11,10 @@ class ReportCreate(BaseModel):
     reporter: str = ""
 
 
+class ReportStatusUpdate(BaseModel):
+    status: str
+
+
 class ReportOut(BaseModel):
     id: int
     code: str

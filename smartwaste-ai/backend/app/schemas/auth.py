@@ -7,6 +7,7 @@ class UserRegister(BaseModel):
     name: str
     email: EmailStr
     password: str
+    role: str = "user"
 
 
 class UserLogin(BaseModel):
@@ -18,6 +19,7 @@ class UserOut(BaseModel):
     id: int
     name: str
     email: EmailStr
+    role: str = "user"
     created_at: datetime
 
     class Config:

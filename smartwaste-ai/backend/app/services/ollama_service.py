@@ -23,19 +23,24 @@ from app.core.config import settings
 
 log = logging.getLogger(__name__)
 
-CATEGORIES = ["Plastic", "Organic", "Paper", "Glass", "Metal", "E-Waste", "Mixed", "Unknown"]
+CATEGORIES = ["Plastic", "Organic", "Paper", "Glass", "Metal", "E-Waste", "Textile", "Mixed", "Unknown"]
 
 SYSTEM_PROMPT = """You are a waste-sorting expert for a municipal SmartWaste system.
-Given photo evidence (auto-extracted measurements, approximate) and an optional operator note,
-classify the waste and respond with ONLY a JSON object — no markdown, no extra text:
+IMPORTANT: you cannot see the photo. You only get approximate measurements plus an operator note.
+Classify the waste and respond with ONLY a JSON object — no markdown, no extra text:
 {
-  "category": one of ["Plastic", "Organic", "Paper", "Glass", "Metal", "E-Waste", "Mixed", "Unknown"],
-  "confidence": integer 0-100 (high only when the operator note clearly names the item; otherwise 40-70),
-  "bin": short bin assignment, e.g. "Blue bin - Recyclables",
+  "category": one of ["Plastic", "Organic", "Paper", "Glass", "Metal", "E-Waste", "Textile", "Mixed", "Unknown"],
+  "confidence": integer 0-100,
+  "bin": short bin assignment,
   "guidance": one or two practical disposal sentences,
   "details": array of 2-4 short factual strings about the item and handling,
   "recyclable": true or false
-}"""
+}
+Rules:
+- If the operator note names the item (e.g. "clothes", "shirt", "bottle", "banana peel"), trust it: pick the matching category with confidence 85-97.
+- Fabric/garment/cloth/shoe words map to "Textile". Bin: "Textile bank - Donate" when clean and dry, else "General waste bin". Guidance must mention donating clean textiles.
+- "Plastic" -> "Blue bin - Recyclables". "Organic"/food -> "Green bin - Compost". "Paper"/cardboard -> "Blue bin - Recyclables". "Glass"/"Metal" -> "Blue bin - Recyclables". "E-Waste"/battery/phone -> "E-waste depot".
+- With NO operator note you are guessing from measurements: choose the single most plausible category, keep confidence 40-70, and say so in guidance (ask the operator to describe the item). Never exceed 70 without an operator note."""
 
 
 def _color_name(rgb: tuple[int, int, int]) -> str:
@@ -77,8 +82,16 @@ def extract_features(image_bytes: bytes) -> dict:
     ]
 
     edges = gray.filter(ImageFilter.FIND_EDGES)
-    edge_density = round(ImageStat.Stat(edges).mean[0] / 255, 3)
+    edge_stat = ImageStat.Stat(edges)
+    edge_density = round(edge_stat.mean[0] / 255, 3)
+    texture = round(edge_stat.stddev[0] / 255, 3)
     colorfulness = round(ImageStat.Stat(small).stddev[0] + ImageStat.Stat(small).stddev[1], 1)
+
+    hsv = small.convert("HSV")
+    saturation = round(ImageStat.Stat(hsv).mean[1] / 255, 3)
+    cx0, cy0 = int(w * 0.3), int(h * 0.3)
+    center = img.crop((cx0, cy0, cx0 + int(w * 0.4), cy0 + int(h * 0.4))).convert("L").resize((64, 64))
+    center_brightness = round(ImageStat.Stat(center).mean[0], 1)
 
     return {
         "dimensions": f"{w}x{h}",
@@ -87,7 +100,18 @@ def extract_features(image_bytes: bytes) -> dict:
         "lighting": "well lit" if brightness > 140 else ("dim" if brightness > 70 else "dark"),
         "contrast": contrast,
         "dominant_colors": dominant,
+        "saturation_0_1": saturation,
+        "colorfulness": colorfulness,
         "edge_density_0_1": edge_density,
+        "texture_0_1": texture,
+        "texture_hint": (
+            "smooth/flat surfaces" if texture < 0.08
+            else ("woven/fibrous or crumpled texture" if texture < 0.2 else "busy/detailed surfaces")
+        ),
+        "center_vs_overall": (
+            "subject brighter than background" if center_brightness > brightness + 15
+            else ("subject darker than background" if center_brightness < brightness - 15 else "even exposure")
+        ),
         "shape_hint": "clear object outlines" if edge_density > 0.12 else "soft/uniform surfaces",
     }
 
@@ -97,8 +121,10 @@ def _evidence_text(features: dict, hint: str | None) -> str:
     lines = [
         f"Dimensions: {features['dimensions']} ({features['orientation']}).",
         f"Lighting: {features['lighting']} (mean brightness {features['brightness_0_255']}/255, contrast {features['contrast']}).",
-        f"Dominant colors: {colors}.",
+        f"Dominant colors: {colors} (saturation {features['saturation_0_1']}).",
         f"Edges: {features['shape_hint']} (density {features['edge_density_0_1']}).",
+        f"Texture: {features['texture_hint']}.",
+        f"Framing: {features['center_vs_overall']}.",
     ]
     if hint and hint.strip():
         lines.append(f"Operator note: \"{hint.strip()}\".")

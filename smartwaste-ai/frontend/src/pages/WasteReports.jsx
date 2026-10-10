@@ -2,14 +2,19 @@ import { useEffect, useState } from "react";
 import Icon from "../components/Icon";
 import StatusBadge from "../components/StatusBadge";
 import WasteCard from "../components/WasteCard";
-import { formatReport, listReports } from "../services/reportService";
+import { isManagement } from "../services/authService";
+import { formatReport, listReports, updateReportStatus } from "../services/reportService";
+
+const STATUSES = ["Pending", "Scheduled", "In-Progress", "Collected", "Missed"];
 
 export default function WasteReports() {
+  const management = isManagement();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [savingId, setSavingId] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -31,6 +36,22 @@ export default function WasteReports() {
       (status === "all" || r.status.toLowerCase() === status) &&
       `${r.id} ${r.category} ${r.location}`.toLowerCase().includes(query.toLowerCase())
   );
+
+  async function onStatusChange(report, next) {
+    if (next === report.status || savingId) return;
+    setSavingId(report.pk);
+    setError("");
+    try {
+      const updated = await updateReportStatus(report.pk, next);
+      setReports((list) =>
+        list.map((r) => (r.pk === report.pk ? formatReport(updated) : r))
+      );
+    } catch {
+      setError("Could not update status. Management role required.");
+    } finally {
+      setSavingId(null);
+    }
+  }
 
   return (
     <div className="page">
@@ -88,7 +109,24 @@ export default function WasteReports() {
                   <td>{r.category}</td>
                   <td>{r.weight}</td>
                   <td>{r.reporter}</td>
-                  <td><StatusBadge status={r.status} /></td>
+                  <td>
+                    {management ? (
+                      <select
+                        className="input"
+                        style={{ height: 36, width: 150, paddingLeft: 10, fontSize: 13 }}
+                        value={r.status}
+                        disabled={savingId === r.pk}
+                        onChange={(e) => onStatusChange(r, e.target.value)}
+                        title="Set status (management)"
+                      >
+                        {STATUSES.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <StatusBadge status={r.status} />
+                    )}
+                  </td>
                 </tr>
               ))}
               {!loading && rows.length === 0 && (
