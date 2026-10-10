@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# Env files
+.env
+!.env.example
+frontend/.env
+backend/.env
+
+# Uploads (local dev only)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Model artifacts (large files)
+ai-model/models/*.pt
+ai-model/models/*.h5
+ai-model/models/*.onnx
+ai-model/dataset/raw/*
+!ai-model/dataset/raw/.gitkeep
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
